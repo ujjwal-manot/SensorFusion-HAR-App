@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'theme.dart';
 
 class ActivityLabels {
+  ActivityLabels._();
+
   static const Map<int, String> macro = {
     0: 'Stationary',
     1: 'Locomotion',
@@ -40,16 +43,20 @@ class ActivityLabels {
   };
 
   static const Map<String, IconData> macroIcons = {
-    'Stationary': Icons.accessibility_new,
-    'Locomotion': Icons.directions_walk,
-    'Vehicle': Icons.directions_car,
-    'Gesture': Icons.pan_tool,
+    'Stationary': Icons.self_improvement,
+    'Locomotion': Icons.directions_run,
+    'Vehicle': Icons.commute,
+    'Gesture': Icons.touch_app,
   };
 
   static const Map<String, Color> macroColors = {
-    'Stationary': Color(0xFF4CAF50),
-    'Locomotion': Color(0xFF2196F3),
-    'Vehicle': Color(0xFFFF9800),
-    'Gesture': Color(0xFF9C27B0),
+    'Stationary': Color(0xFF10B981),
+    'Locomotion': Color(0xFF3B82F6),
+    'Vehicle': Color(0xFFF59E0B),
+    'Gesture': Color(0xFF8B5CF6),
   };
+
+  static List<Color> macroGradient(String activity) {
+    return AppTheme.gradientForCategory(activity);
+  }
 }

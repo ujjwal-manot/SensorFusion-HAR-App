@@ -1,25 +1,24 @@
-import 'package:flutter/material.dart';
 import 'dart:math';
+import 'package:flutter/material.dart';
+import '../config/theme.dart';
 
+/// Premium circular confidence gauge with gradient stroke, glow effect,
+/// animated sweep, and large percentage display.
 class ConfidenceGauge extends StatelessWidget {
   final double confidence;
   final double size;
+  final List<Color>? gradientColors;
 
   const ConfidenceGauge({
     super.key,
     required this.confidence,
-    this.size = 64,
+    this.size = 80,
+    this.gradientColors,
   });
-
-  Color _getColor() {
-    if (confidence >= 0.8) return Colors.green;
-    if (confidence >= 0.6) return Colors.yellow.shade700;
-    return Colors.red;
-  }
 
   @override
   Widget build(BuildContext context) {
-    final color = _getColor();
+    final colors = gradientColors ?? AppTheme.accentGradient;
     final percentage = (confidence * 100).toStringAsFixed(0);
 
     return SizedBox(
@@ -27,23 +26,40 @@ class ConfidenceGauge extends StatelessWidget {
       height: size,
       child: TweenAnimationBuilder<double>(
         tween: Tween(begin: 0, end: confidence),
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeOutCubic,
-        builder: (context, value, child) {
+        duration: const Duration(milliseconds: 700),
+        curve: Curves.easeOutBack,
+        builder: (context, value, _) {
           return CustomPaint(
-            painter: _GaugePainter(
+            painter: _GaugeGlowPainter(
               progress: value,
-              color: color,
-              backgroundColor: Colors.grey.withOpacity(0.2),
+              gradientColors: colors,
+              bgColor: AppTheme.cardColor.withOpacity(0.4),
+              strokeWidth: 8,
             ),
             child: Center(
-              child: Text(
-                '$percentage%',
-                style: TextStyle(
-                  fontSize: size * 0.22,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$percentage%',
+                    style: TextStyle(
+                      fontSize: size * 0.28,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.textPrimary,
+                      height: 1,
+                    ),
+                  ),
+                  SizedBox(height: size * 0.02),
+                  Text(
+                    'CONFIDENCE',
+                    style: TextStyle(
+                      fontSize: size * 0.08,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textTertiary,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                ],
               ),
             ),
           );
@@ -53,56 +69,70 @@ class ConfidenceGauge extends StatelessWidget {
   }
 }
 
-class _GaugePainter extends CustomPainter {
+class _GaugeGlowPainter extends CustomPainter {
   final double progress;
-  final Color color;
-  final Color backgroundColor;
+  final List<Color> gradientColors;
+  final Color bgColor;
+  final double strokeWidth;
 
-  _GaugePainter({
+  _GaugeGlowPainter({
     required this.progress,
-    required this.color,
-    required this.backgroundColor,
+    required this.gradientColors,
+    required this.bgColor,
+    required this.strokeWidth,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = min(size.width, size.height) / 2 - 4;
-    const strokeWidth = 6.0;
+    final radius = min(size.width, size.height) / 2 - strokeWidth;
+    final rect = Rect.fromCircle(center: center, radius: radius);
 
-    // Background arc
+    // Background track
     final bgPaint = Paint()
-      ..color = backgroundColor
+      ..color = bgColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -pi / 2,
-      2 * pi,
-      false,
-      bgPaint,
-    );
+    canvas.drawArc(rect, -pi / 2, 2 * pi, false, bgPaint);
 
-    // Progress arc
+    if (progress <= 0) return;
+
+    final sweepAngle = 2 * pi * progress;
+
+    // Glow layer (wider, more transparent)
+    final glowPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth + 6
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8)
+      ..shader = SweepGradient(
+        startAngle: -pi / 2,
+        endAngle: -pi / 2 + sweepAngle,
+        colors: gradientColors,
+        transform: const GradientRotation(-pi / 2),
+      ).createShader(rect);
+
+    canvas.drawArc(rect, -pi / 2, sweepAngle, false, glowPaint);
+
+    // Main gradient arc
     final progressPaint = Paint()
-      ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
+      ..strokeCap = StrokeCap.round
+      ..shader = SweepGradient(
+        startAngle: -pi / 2,
+        endAngle: -pi / 2 + sweepAngle,
+        colors: gradientColors,
+        transform: const GradientRotation(-pi / 2),
+      ).createShader(rect);
 
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -pi / 2,
-      2 * pi * progress,
-      false,
-      progressPaint,
-    );
+    canvas.drawArc(rect, -pi / 2, sweepAngle, false, progressPaint);
   }
 
   @override
-  bool shouldRepaint(covariant _GaugePainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.color != color;
+  bool shouldRepaint(covariant _GaugeGlowPainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }

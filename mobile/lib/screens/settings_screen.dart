@@ -3,17 +3,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
+import '../config/theme.dart';
 import '../providers/auth_provider.dart';
 import '../providers/activity_provider.dart';
+import '../widgets/glass_card.dart';
 
-class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key});
+/// Settings screen redesigned as a tab within the main home shell.
+class SettingsTab extends ConsumerStatefulWidget {
+  const SettingsTab({super.key});
 
   @override
-  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsTab> createState() => _SettingsTabState();
 }
 
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+class _SettingsTabState extends ConsumerState<SettingsTab> {
   final _serverUrlController = TextEditingController();
   bool _urlSaved = false;
 
@@ -63,14 +66,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _logout() async {
-    // Stop services
     final wsService = ref.read(webSocketServiceProvider);
     wsService.disconnect();
 
     final syncService = ref.read(syncServiceProvider);
     syncService.stop();
 
-    // Clear auth
     await ref.read(authProvider.notifier).logout();
 
     if (mounted) {
@@ -83,222 +84,290 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final authState = ref.watch(authProvider);
     final inferenceService = ref.watch(inferenceServiceProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
         children: [
-          // User Info
+          // Header
+          const Text(
+            'Settings',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textPrimary,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // User profile card
           if (authState.user != null) ...[
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: Colors.green.withOpacity(0.2),
-                      radius: 24,
+            GlassCard(
+              glowColors: AppTheme.accentGradient,
+              glowOpacity: 0.06,
+              glowBlur: 20,
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  // Avatar
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: AppTheme.accentGradient,
+                      ),
+                    ),
+                    child: Center(
                       child: Text(
                         authState.user!.displayName.isNotEmpty
                             ? authState.user!.displayName[0].toUpperCase()
                             : '?',
                         style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            authState.user!.displayName,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          authState.user!.displayName,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimary,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            authState.user!.email,
-                            style: TextStyle(
-                              color: Colors.grey[500],
-                              fontSize: 13,
-                            ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          authState.user!.email,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.textSecondary,
                           ),
-                        ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Role badge
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: AppTheme.accent.withOpacity(0.1),
+                      border: Border.all(
+                        color: AppTheme.accent.withOpacity(0.2),
                       ),
                     ),
-                  ],
-                ),
+                    child: Text(
+                      authState.user!.role.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.accent,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
           ],
 
-          // Server URL
-          Text(
-            'Server Configuration',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: _serverUrlController,
-                    decoration: const InputDecoration(
-                      labelText: 'Server URL',
-                      hintText: 'http://192.168.1.100:8000',
-                      prefixIcon: Icon(Icons.dns_outlined),
+          // ── Connection Section ──────────────────────────────────────
+          _SectionHeader(title: 'CONNECTION'),
+          const SizedBox(height: 10),
+          GlassCard(
+            enableBlur: false,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: _serverUrlController,
+                  style: const TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 14,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'http://192.168.1.100:8000',
+                    prefixIcon: const Icon(Icons.dns_outlined, size: 20),
+                    suffixIcon: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: _urlSaved
+                          ? const Icon(
+                              Icons.check_circle_rounded,
+                              key: ValueKey('check'),
+                              color: AppTheme.success,
+                              size: 20,
+                            )
+                          : const SizedBox.shrink(key: ValueKey('empty')),
                     ),
                   ),
+                ),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: _saveServerUrl,
+                  child: Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: AppTheme.accent.withOpacity(0.12),
+                      border: Border.all(
+                        color: AppTheme.accent.withOpacity(0.25),
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        _urlSaved ? 'Saved' : 'Save URL',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.accent,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // ── Model Section ───────────────────────────────────────────
+          _SectionHeader(title: 'MODEL'),
+          const SizedBox(height: 10),
+          GlassCard(
+            enableBlur: false,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                _InfoRow(label: 'Model', value: 'CascadeHAR Macro'),
+                const SizedBox(height: 12),
+                _InfoRow(label: 'Input Shape', value: '(1, 9, 128)'),
+                const SizedBox(height: 12),
+                _InfoRow(
+                  label: 'Status',
+                  value: inferenceService.isLoaded ? 'Loaded' : 'Not loaded',
+                  valueColor: inferenceService.isLoaded
+                      ? AppTheme.success
+                      : AppTheme.error,
+                  showDot: true,
+                ),
+                if (inferenceService.loadError != null) ...[
                   const SizedBox(height: 12),
-                  FilledButton.icon(
-                    onPressed: _saveServerUrl,
-                    icon: Icon(_urlSaved ? Icons.check : Icons.save),
-                    label: Text(_urlSaved ? 'Saved' : 'Save URL'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Model Info
-          Text(
-            'Model Information',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildInfoRow('Model', 'CascadeHAR Macro'),
-                  const SizedBox(height: 8),
-                  _buildInfoRow('Classes', '4 (Stationary, Locomotion, Vehicle, Gesture)'),
-                  const SizedBox(height: 8),
-                  _buildInfoRow('Input Shape', '(1, 9, 128)'),
-                  const SizedBox(height: 8),
-                  _buildInfoRow(
-                    'Status',
-                    inferenceService.isLoaded ? 'Loaded' : 'Not loaded',
-                  ),
-                  if (inferenceService.loadError != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      inferenceService.loadError!,
-                      style: const TextStyle(color: Colors.red, fontSize: 12),
+                  Text(
+                    inferenceService.loadError!,
+                    style: const TextStyle(
+                      color: AppTheme.error,
+                      fontSize: 12,
                     ),
-                  ],
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
 
-          // Sync Settings
-          Text(
-            'Sync Settings',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+          // ── Streaming Section ───────────────────────────────────────
+          _SectionHeader(title: 'STREAMING'),
+          const SizedBox(height: 10),
+          GlassCard(
+            enableBlur: false,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                _InfoRow(
+                  label: 'Sampling Rate',
+                  value: '${AppConfig.samplingRateHz} Hz',
                 ),
-          ),
-          const SizedBox(height: 8),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildInfoRow(
-                    'Sync Interval',
-                    '${AppConfig.syncIntervalSeconds}s',
-                  ),
-                  const SizedBox(height: 8),
-                  _buildInfoRow(
-                    'Batch Size',
-                    '${AppConfig.syncBatchSize}',
-                  ),
-                  const SizedBox(height: 8),
-                  _buildInfoRow(
-                    'Sampling Rate',
-                    '${AppConfig.samplingRateHz} Hz',
-                  ),
-                  const SizedBox(height: 8),
-                  _buildInfoRow(
-                    'Window Size',
-                    '${AppConfig.windowSize} samples',
-                  ),
-                  const SizedBox(height: 8),
-                  _buildInfoRow(
-                    'Stride Size',
-                    '${AppConfig.strideSize} samples',
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // About
-          Text(
-            'About',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+                const SizedBox(height: 12),
+                _InfoRow(
+                  label: 'Window Size',
+                  value: '${AppConfig.windowSize} samples',
                 ),
+                const SizedBox(height: 12),
+                _InfoRow(
+                  label: 'Stride Size',
+                  value: '${AppConfig.strideSize} samples',
+                ),
+                const SizedBox(height: 12),
+                _InfoRow(
+                  label: 'Sync Interval',
+                  value: '${AppConfig.syncIntervalSeconds}s',
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 28),
+
+          // ── About Section ───────────────────────────────────────────
+          _SectionHeader(title: 'ABOUT'),
+          const SizedBox(height: 10),
+          GlassCard(
+            enableBlur: false,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _InfoRow(label: 'App', value: 'SensorFusion HAR'),
+                const SizedBox(height: 12),
+                const _InfoRow(label: 'Version', value: '1.0.0'),
+                const SizedBox(height: 12),
+                const _InfoRow(
+                    label: 'Architecture', value: 'CascadeHAR'),
+                const SizedBox(height: 14),
+                Text(
+                  'Real-time human activity recognition using on-device '
+                  'TFLite inference with phone accelerometer, gyroscope, '
+                  'and magnetometer data.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textTertiary.withOpacity(0.8),
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // ── Logout Button ───────────────────────────────────────────
+          GestureDetector(
+            onTap: _logout,
+            child: Container(
+              height: 52,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                color: AppTheme.error.withOpacity(0.08),
+                border: Border.all(
+                  color: AppTheme.error.withOpacity(0.2),
+                ),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _buildInfoRow('App', 'SensorFusion HAR'),
-                  const SizedBox(height: 8),
-                  _buildInfoRow('Version', '1.0.0'),
-                  const SizedBox(height: 8),
-                  _buildInfoRow('Architecture', 'CascadeHAR - Macro + Fine'),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Real-time human activity recognition using on-device '
-                    'TFLite inference with phone accelerometer, gyroscope, '
-                    'and magnetometer data.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  Icon(Icons.logout_rounded, color: AppTheme.error, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Logout',
+                    style: TextStyle(
+                      color: AppTheme.error,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
                   ),
                 ],
               ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Logout
-          OutlinedButton.icon(
-            onPressed: _logout,
-            icon: const Icon(Icons.logout, color: Colors.red),
-            label: const Text(
-              'Logout',
-              style: TextStyle(color: Colors.red),
-            ),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Colors.red),
-              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
           ),
           const SizedBox(height: 32),
@@ -306,31 +375,96 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
+}
 
-  Widget _buildInfoRow(String label, String value) {
+// ── Section Header ────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        color: AppTheme.textTertiary,
+        letterSpacing: 2,
+      ),
+    );
+  }
+}
+
+// ── Info Row ──────────────────────────────────────────────────────────
+
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? valueColor;
+  final bool showDot;
+
+  const _InfoRow({
+    required this.label,
+    required this.value,
+    this.valueColor,
+    this.showDot = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 120,
+          width: 110,
           child: Text(
             label,
-            style: TextStyle(
-              color: Colors.grey[500],
+            style: const TextStyle(
               fontSize: 13,
+              color: AppTheme.textTertiary,
             ),
           ),
         ),
+        if (showDot) ...[
+          Container(
+            width: 6,
+            height: 6,
+            margin: const EdgeInsets.only(right: 6),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: valueColor ?? AppTheme.textPrimary,
+              boxShadow: [
+                BoxShadow(
+                  color: (valueColor ?? AppTheme.textPrimary).withOpacity(0.4),
+                  blurRadius: 4,
+                ),
+              ],
+            ),
+          ),
+        ],
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-              fontWeight: FontWeight.w500,
+            style: TextStyle(
               fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: valueColor ?? AppTheme.textPrimary,
             ),
           ),
         ),
       ],
     );
+  }
+}
+
+/// Legacy SettingsScreen wrapper (kept for backward compatibility if needed).
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(body: SettingsTab());
   }
 }
