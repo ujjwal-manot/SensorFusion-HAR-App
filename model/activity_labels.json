@@ -1,0 +1,38 @@
+{
+  "macro": {
+    "0": "stationary",
+    "1": "locomotion",
+    "2": "vehicle",
+    "3": "gesture"
+  },
+  "fine": {
+    "stationary": {
+      "0": "standing",
+      "1": "sitting",
+      "2": "lying_down",
+      "3": "leaning"
+    },
+    "locomotion": {
+      "0": "walking",
+      "1": "running",
+      "2": "stairs_up",
+      "3": "stairs_down",
+      "4": "jogging",
+      "5": "cycling"
+    },
+    "vehicle": {
+      "0": "car",
+      "1": "bus",
+      "2": "train",
+      "3": "stationary_vehicle"
+    },
+    "gesture": {
+      "0": "phone_pickup",
+      "1": "phone_putdown",
+      "2": "shaking",
+      "3": "flipping",
+      "4": "typing",
+      "5": "calling"
+    }
+  }
+}
